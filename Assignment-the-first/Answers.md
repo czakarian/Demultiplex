@@ -12,14 +12,24 @@
 
 2. Per-base NT distribution
     1. Use markdown to insert your 4 histograms here.
+   
+    
     ```Read 1```
+    
     ![Read 1](https://github.com/czakarian/Demultiplex/blob/master/Assignment-the-first/R1_plot.png)
+    
     ```Index 1```
+    
     ![Read 2](https://github.com/czakarian/Demultiplex/blob/master/Assignment-the-first/R2_plot.png)
+    
     ```Index 2```
+    
     ![Read 3](https://github.com/czakarian/Demultiplex/blob/master/Assignment-the-first/R3_plot.png)
+    
     ```Read 2```
+    
     ![Read 4](https://github.com/czakarian/Demultiplex/blob/master/Assignment-the-first/R4_plot.png)
+
 
 What is a good quality score cutoff for index reads and biological read pairs to utilize for sample identification and downstream analysis, respectively? Justify your answer.
 ```
