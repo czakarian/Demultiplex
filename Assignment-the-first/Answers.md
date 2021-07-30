@@ -77,9 +77,8 @@ How many indexes have undetermined (N) base calls?
 ```
     To get a list of indexes, open and parse through the indexes text file
         Store the index and the index label in a dictionary [will be referenced later when naming the output FASTQ files)
-        Do we want to store the other info in each row?
     Open up all the output FASTQ files (48 matched files + 2 swapped + 2 unknown) to write to [don't use 'with open' just 'open']
-        there should be R1, R2 pair for each index, for swapped, and for unknown
+        there should be R1, R2 pair for each index (24), for swapped, and for unknown
 
     Once your output files are open and ready to write to, will begin parsing through the input FASTQ files for read1, read2, and index1, index2
         Will go line by line to compare index 1 with index 2
