@@ -12,8 +12,12 @@
 
 2. Per-base NT distribution
     1. Use markdown to insert your 4 histograms here.
-    2. ```R1_plot.png```
-    3. ```Your answer here```
+    ![Read 1](https://github.com/czakarian/Demultiplex/blob/master/Assignment-the-first/R1_plot.png)
+    ![Read 2](https://github.com/czakarian/Demultiplex/blob/master/Assignment-the-first/R2_plot.png)
+    ![Read 3](https://github.com/czakarian/Demultiplex/blob/master/Assignment-the-first/R3_plot.png)
+    ![Read 4](https://github.com/czakarian/Demultiplex/blob/master/Assignment-the-first/R4_plot.png)
+
+
     
 ## Part 2
 1. Define the problem
