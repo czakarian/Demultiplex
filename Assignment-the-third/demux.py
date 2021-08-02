@@ -7,6 +7,7 @@
 
 import argparse
 import Bioinfo
+import gzip
 
 def get_args():
     """This function returns the parser arguments entered in command line"""
@@ -25,53 +26,115 @@ indexes = args.indexes
 #dir = args.dir
 
 # Dictionary to store list of index seqs and other related index info (sample, group, treatment, index)
-# Key = string of index sequence, Value = other related index info 
+# Key = index sequence, Value = Dictionary identifying sample, group, treatment, and index values
 index_dict = {}
 
 # extract the index sequences and other related info from text file and store in index_dict
-with open(indexes, "r") as fr:
-    fr.readline()
+with open(indexes, "rt") as fr:
+    fr.readline() 
     for line in fr:
         line = line.strip()
         cols = line.split('\t')
-        indexinfo = ""
+        index_info_dict = {}
         for col in cols:
-            indexinfo = indexinfo + col + "_" 
-        seq = cols[4]
-        index_dict[seq] = indexinfo
+            index_info_dict['sample'] = cols[0]
+            index_info_dict['group'] = cols[1]
+            index_info_dict['treatment'] = cols[2]
+            index_info_dict['index'] = cols[3]
+        index_dict[cols[4]] = index_info_dict
 
+#print(index_dict)
+
+# Dictionary to store indexes and their reverse complements // to avoid calling rev_comp for every index read while parsing index 2 fq file
+# Keys = Index, Value = Reverse Complement of Index 
+rc_index_dict = {}
+for i in index_dict:
+    rc_index_dict[i]= Bioinfo.rev_comp(i)
+
+#print(index_dict)
+#print(rc_index_dict)
 
 ###############
 # for testing, remove later
-index_dict = {"GTCC": "i1_ut_GTCC_", "AGAA": "i2_ut_AGAA_"}
+#index_dict = {"GTCC": "i1_ut_GTCC_", "AGAA": "i2_ut_AGAA_"}
 ###############
 
-
 # open all the output FASTQ files (48 matched files + 2 swapped + 2 unknown) to write to when parsing the input FASTQ files
-swapped_R1 = open("output/swapped_R1.fq", "w")
-swapped_R2 = open("output/swapped_R2.fq", "w")
-unknown_R1 = open("output/unknown_R1.fq", "w")
-unknown_R2 = open("output/unknown_R2.fq", "w")
+swapped_R1 = gzip.open("unit_output/swapped_R1.fq.gz", "wt")
+swapped_R2 = gzip.open("unit_output/swapped_R2.fq.gz", "wt")
+unknown_R1 = gzip.open("unit_output/unknown_R1.fq.gz", "wt")
+unknown_R2 = gzip.open("unit_output/unknown_R2.fq.gz", "wt")
 # Dictionary to store all the output file handlers to be able to reference when parsing through the input FASTQ files
 # Keys = name of file handle (same as file name), Values = the file handle
-file_handlers = {"swapped_R1":swapped_R1, "swapped_R2":swapped_R2, "unknown_R1":unknown_R1, "unknown_R2":unknown_R2}
+file_handlers_dict = {"swapped_R1.fq.gz":swapped_R1, "swapped_R2.fq.gz":swapped_R2, "unknown_R1.fq.gz":unknown_R1, "unknown_R2.fq.gz":unknown_R2}
 for i in index_dict:
-    ########
-    # make all the keys the same as the file names? including .fq part?
-    ########
-    r1= "output/" + i + "_" + Bioinfo.rev_comp(i) + "_R1.fq" 
-    r2 = "output/" + i + "_" + Bioinfo.rev_comp(i) + "_R2.fq"
-    file_handlers[i] = open(r1, "w") 
-    file_handlers[Bioinfo.rev_comp(i)] = open(r2, "w")
+    r1= i + "_" + Bioinfo.rev_comp(i) + "_R1.fq.gz" 
+    r2 = i + "_" + Bioinfo.rev_comp(i) + "_R2.fq.gz"
+    file_handlers_dict[r1] = gzip.open("unit_output/" + r1, "wt") 
+    file_handlers_dict[r2] = gzip.open("unit_output/" + r2, "wt")
 
 
+# would this be easier ?? than just storing the 26 counters instead of redundant 52?
+# Dictionary to store counts for all matched indexes, swapped indexes, unknown indexes, and low quality indexes
+# Key = Bucket, Value = count
+counter_dict = {}
+for i in file_handlers_dict:
+    counter_dict[i] = 0
 
+#print(counter_dict)
+
+# need to use gzip for the actual files
 # open input files (pair of read FASTQs and pair of index FASTQs)
-fq1 = open("../TEST-input_FASTQ/unit_test_R1.fq", "r")
-fq2 = open("../TEST-input_FASTQ/unit_test_R2.fq", "r")
-fq3 = open("../TEST-input_FASTQ/unit_test_R3.fq", "r")
-fq4 = open("../TEST-input_FASTQ/unit_test_R4.fq", "r")
+fq1 = gzip.open("../TEST-input_FASTQ/unit_test_R1.fq.gz", "rt")
+fq2 = gzip.open("../TEST-input_FASTQ/unit_test_R2.fq.gz", "rt")
+fq3 = gzip.open("../TEST-input_FASTQ/unit_test_R3.fq.gz", "rt")
+fq4 = gzip.open("../TEST-input_FASTQ/unit_test_R4.fq.gz", "rt")
 
+# Begin parsing the 4 input files one read at a time in parallel
+while True:
+    r1_lines = [0] * 4
+    r2_lines = [0] * 4
+    i1_lines = [0] * 4
+    i2_lines = [0] * 4
+    for i in range(4):
+        r1_lines[i] = fq1.readline().strip()
+        r2_lines[i] = fq2.readline().strip()
+        i1_lines[i] = fq3.readline().strip()
+        i2_lines[i] = fq4.readline().strip()
+    
+    if r1_lines[i] == '':
+        break
+    
+    # print(r1_lines)
+    # print(r2_lines)
+    # print(i1_lines)
+    # print(i2_lines)
+
+    index1_seq = i1_lines[1]
+    index2_seq = i2_lines[1]
+    index1_qs = i1_lines[3]
+    index2_qs = i2_lines[3]
+
+    bucket = ""
+    # check if both indexes meet the quality score cutoff
+    if Bioinfo.meets_Qcutoff(index1_qs) and Bioinfo.meets_Qcutoff(index2_qs):
+        # check if both indexes are valid // don't contain N's
+        if index1_seq in index_dict and index2_seq in rc_index_dict:
+            # check if the 2 indexes are reverse comp of each other
+            if index1_seq == rev_comp(index2_seq):
+                bucket = index1_seq
+                # increment counter
+            else:
+                bucket = "swapped"
+                # increment counter
+        else:
+            bucket = "unknown"
+            # increment counter
+    else:
+        bucket = "unknown"
+        # increment counter
+
+    print(bucket)
 
 # close the input files 
 fq1.close()
@@ -80,16 +143,20 @@ fq3.close()
 fq4.close()
 
 # close all the output FASTQ files 
-for file in file_handlers:
-    file_handlers[file].close()
+for file in file_handlers_dict:
+    file_handlers_dict[file].close()
 
+
+
+
+
+
+
+###
+# Making sure input files are zipped and FASTQ files? do a check?
+###
 
 """
-    Once your output files are open and ready to write to, will begin parsing through the input FASTQ files for read1, read2, and index1, index2
-        Will go line by line to compare index 1 with index 2
-        For each pair of indices we will determine which bucket it should be sent to and output the 4 lines for each pair of reads to either the R1 or R2 file in corresponding bucket
-        Before going through the input files, make sure to initialize counter variables for each bucket
-
     For the 2 read FASTQ files and 2 index FASTQ files, will extract one read at at time (line by line) and append the read to its appropriate bucket file
         1. Extract and store the header [only up to the space // all 4 files should have the same header up to the space]
             [will append the pair of index sequences to the end of the header before outputting to files]
@@ -99,17 +166,6 @@ for file in file_handlers:
 
     Temp variables to include: header, R1seq, R2seq, I1seq, I2seq, line3, R1q, R2q, I1q, I2q
 
-        Set temporary variable to store the bucket that the reads will be sent to after going through the following conditions
-            If index1 and index2 RC are in the index dictionary // could be either matched or swapped 
-                If index1 and index2 both meet the quality score cutoff:
-                    if index 1 equals index2 RC:
-                        send to matched index bucket and increment counter 
-                    Else swapped indexes
-                        send to swapped bucket and increment counter
-                Else if either or both indexes don't meet cutoff: 
-                    send to trash and increment counter      
-            Else if either one or both indexes not in the dictionary // means not valid index:
-                send to trash bin and increment counter
         At this point you should know which bucket your reads should go to and you have all the info stored for both reads
             To the pair of R1 and R2 files for the appropriate bucket (files should already be open):
                 output the modified header to each file

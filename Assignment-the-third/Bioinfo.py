@@ -68,9 +68,18 @@ def rev_comp(seq:str) -> str:
     comp_seq = ""
     for c in seq:
         comp_seq = comp_seq + base_pairs[c]
-    # reverse the complemented sequence
-    rev_comp_seq = comp_seq[::-1]
-    return rev_comp_seq
+    # return reverse complemented sequence
+    return comp_seq[::-1]
+
+
+def meets_Qcutoff(qvalues: str) -> bool:
+    """This function takes as input a string of index quality scores
+    and returns True if none of the indexes have a quality score that
+    is less than 30.""" 
+    for c in qvalues:
+        if convert_phred(c) < 30:
+            return False
+    return True
 
 
 if __name__ == "__main__":
@@ -96,3 +105,9 @@ if __name__ == "__main__":
 
     assert rev_comp("ATTGGC") == "GCCAAT", "rev_comp does not return correct reverse complement string"
     print("Reverse complement correct")
+
+    assert meets_Qcutoff("II>III") == False, "meets_Qcutoff does not correctly return False"
+    print("Quality score cutoff check successful")
+
+    assert meets_Qcutoff("IIIIII") == True, "meets_Qcutoff does not correctly returns True"
+    print("Quality score cutoff check successful")
