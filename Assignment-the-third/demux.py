@@ -12,18 +12,20 @@ import gzip
 def get_args():
     """This function returns the parser arguments entered in command line"""
     parser = argparse.ArgumentParser(description="A program to demultiplex sequencing files")
-    #parser.add_argument("-f", "--files", help="Input FASTQ filenames (one read pair, one index pair)", nargs='4', required=True)
+    parser.add_argument("-f", "--files", help="Input FASTQ filenames (one read pair, one index pair)", nargs=4, required=True)
     parser.add_argument("-i", "--indexes", help="Index filename", required=True)
-    #parser.add_argument("-o", "--ofile", help="Output filename", required=True)
-    #parser.add_argument("-d", "--dir", help="Output directory", required=True)
+    parser.add_argument("-d", "--direct", help="Output directory", required=True)
     return parser.parse_args()
+
+###
+# Making sure input files are zipped and FASTQ files? do a check?
+###
 
 # store the command line args in variables
 args = get_args()
-#files= args.files
+files= args.files
 indexes = args.indexes
-#ofile = args.ofile
-#dir = args.dir
+direct = args.direct
 
 # Dictionary to store list of index seqs and other related index info (sample, group, treatment, index)
 # Key = index sequence, Value = Dictionary identifying sample, group, treatment, and index values
@@ -49,92 +51,123 @@ with open(indexes, "rt") as fr:
 # Keys = Index, Value = Reverse Complement of Index 
 rc_index_dict = {}
 for i in index_dict:
-    rc_index_dict[i]= Bioinfo.rev_comp(i)
+    rc_index_dict[Bioinfo.rev_comp(i)]= i
 
 #print(index_dict)
 #print(rc_index_dict)
 
-###############
-# for testing, remove later
-#index_dict = {"GTCC": "i1_ut_GTCC_", "AGAA": "i2_ut_AGAA_"}
-###############
+# Dictionary to store counts for all matched indexes read-pairs
+# Key = matched index pair, Value = count
+counter_matched_dict = {}
+for i in index_dict:
+    counter_matched_dict[i] = 0
 
-# open all the output FASTQ files (48 matched files + 2 swapped + 2 unknown) to write to when parsing the input FASTQ files
-swapped_R1 = gzip.open("unit_output/swapped_R1.fq.gz", "wt")
-swapped_R2 = gzip.open("unit_output/swapped_R2.fq.gz", "wt")
-unknown_R1 = gzip.open("unit_output/unknown_R1.fq.gz", "wt")
-unknown_R2 = gzip.open("unit_output/unknown_R2.fq.gz", "wt")
+# Dictionary to store counts for all swapped index read-pairs
+# Key = swapped index pair, value = count
+counter_swapped_dict = {}
+
+# variable to store number of unknown read-pairs
+counter_unknown = 0
+counter_swapped = 0
+counter_matched = 0
+
+# open all the output FASTQ files (48 matched files + 2 swapped + 2 unknown) to write to when parsing the input FASTQ files // open as zipped files
+#make sure to have gzip, "wt" and .fq.gz
+swapped_R1 = gzip.open(direct + "/swapped_R1.fq.gz", "wt")
+swapped_R2 = gzip.open(direct + "/swapped_R2.fq.gz", "wt")
+unknown_R1 = gzip.open(direct + "/unknown_R1.fq.gz", "wt")
+unknown_R2 = gzip.open(direct + "/unknown_R2.fq.gz", "wt")
+
 # Dictionary to store all the output file handlers to be able to reference when parsing through the input FASTQ files
 # Keys = name of file handle (same as file name), Values = the file handle
 file_handlers_dict = {"swapped_R1.fq.gz":swapped_R1, "swapped_R2.fq.gz":swapped_R2, "unknown_R1.fq.gz":unknown_R1, "unknown_R2.fq.gz":unknown_R2}
 for i in index_dict:
-    r1= i + "_" + Bioinfo.rev_comp(i) + "_R1.fq.gz" 
-    r2 = i + "_" + Bioinfo.rev_comp(i) + "_R2.fq.gz"
-    file_handlers_dict[r1] = gzip.open("unit_output/" + r1, "wt") 
-    file_handlers_dict[r2] = gzip.open("unit_output/" + r2, "wt")
+    r1 = index_dict[i]["index"] + "_R1.fq.gz" 
+    r2 = index_dict[i]["index"] + "_R2.fq.gz"
+    file_handlers_dict[r1] = gzip.open(direct + "/" + r1, "wt") 
+    file_handlers_dict[r2] = gzip.open(direct + "/" + r2, "wt")
 
 
-# would this be easier ?? than just storing the 26 counters instead of redundant 52?
-# Dictionary to store counts for all matched indexes, swapped indexes, unknown indexes, and low quality indexes
-# Key = Bucket, Value = count
-counter_dict = {}
-for i in file_handlers_dict:
-    counter_dict[i] = 0
-
-#print(counter_dict)
-
-# need to use gzip for the actual files
 # open input files (pair of read FASTQs and pair of index FASTQs)
-fq1 = gzip.open("../TEST-input_FASTQ/unit_test_R1.fq.gz", "rt")
-fq2 = gzip.open("../TEST-input_FASTQ/unit_test_R2.fq.gz", "rt")
-fq3 = gzip.open("../TEST-input_FASTQ/unit_test_R3.fq.gz", "rt")
-fq4 = gzip.open("../TEST-input_FASTQ/unit_test_R4.fq.gz", "rt")
+fq1 = gzip.open(files[0], "rt")
+fq2 = gzip.open(files[1], "rt")
+fq3 = gzip.open(files[2], "rt")
+fq4 = gzip.open(files[3], "rt")
+
+readcounter = 0
 
 # Begin parsing the 4 input files one read at a time in parallel
 while True:
+    readcounter +=1
+    if readcounter % 2500000 == 0:
+        print("Read ", readcounter)
+
     r1_lines = [0] * 4
     r2_lines = [0] * 4
     i1_lines = [0] * 4
     i2_lines = [0] * 4
     for i in range(4):
         r1_lines[i] = fq1.readline().strip()
-        r2_lines[i] = fq2.readline().strip()
-        i1_lines[i] = fq3.readline().strip()
-        i2_lines[i] = fq4.readline().strip()
+        r2_lines[i] = fq4.readline().strip()
+        i1_lines[i] = fq2.readline().strip()
+        i2_lines[i] = fq3.readline().strip()
     
+    # exit when you reach end of the file
     if r1_lines[i] == '':
         break
-    
-    # print(r1_lines)
-    # print(r2_lines)
-    # print(i1_lines)
-    # print(i2_lines)
 
+    # initialized specific variables for each of the 4 lines of the 4 files // just for easier reference 
     index1_seq = i1_lines[1]
     index2_seq = i2_lines[1]
     index1_qs = i1_lines[3]
     index2_qs = i2_lines[3]
+    index1_desc = i1_lines[2]
+    index2_desc = i2_lines[2]
 
+    read1_seq = r1_lines[1] 
+    read2_seq = r2_lines[1]
+    read1_qs = r1_lines[3]
+    read2_qs = r2_lines[3]
+    read1_desc = r1_lines[2]
+    read2_desc = r2_lines[2]
+
+    # store the rc of index2 seq so you only need to call the actual fxn once
+    rc = Bioinfo.rev_comp(index2_seq)
+
+    # append i1 and i2 rc indexes to the header
+    header = r1_lines[0].split(' ')
+    header = header[0] + "-" + index1_seq + "-" + rc
+    
+    # determine which bucket your read will be sent to
     bucket = ""
-    # check if both indexes meet the quality score cutoff
-    if Bioinfo.meets_Qcutoff(index1_qs) and Bioinfo.meets_Qcutoff(index2_qs):
-        # check if both indexes are valid // don't contain N's
-        if index1_seq in index_dict and index2_seq in rc_index_dict:
-            # check if the 2 indexes are reverse comp of each other
-            if index1_seq == rev_comp(index2_seq):
-                bucket = index1_seq
-                # increment counter
-            else:
-                bucket = "swapped"
-                # increment counter
+
+    # check if both indexes are valid / don't contain N's and meet the quality score cutoff
+    if index1_seq in index_dict and index2_seq in rc_index_dict and Bioinfo.meets_Qcutoff(index1_qs) and Bioinfo.meets_Qcutoff(index2_qs):
+        # check if the 2 indexes are reverse comp of each other
+        if index1_seq == rc:
+            bucket = index_dict[index1_seq]["index"]
+            counter_matched_dict[index1_seq] += 1
+            counter_matched += 1
         else:
-            bucket = "unknown"
-            # increment counter
+            bucket = "swapped"
+            s = index1_seq + "-" + index2_seq
+            if s in counter_swapped_dict:
+                counter_swapped_dict[s] += 1
+            else:
+                counter_swapped_dict[s] = 1
+                counter_swapped += 1
     else:
         bucket = "unknown"
-        # increment counter
+        counter_unknown += 1
 
-    print(bucket)
+    #print(bucket)
+
+    # append each read to the corresponding bucket file
+    r1file = file_handlers_dict[bucket + "_R1.fq.gz"]
+    r2file = file_handlers_dict[bucket + "_R2.fq.gz"]
+
+    r1file.write(header + "\n" + read1_seq + "\n" + read1_desc + "\n" + read1_qs + "\n")
+    r2file.write(header + "\n" + read2_seq + "\n" + read2_desc + "\n" + read2_qs + "\n")
 
 # close the input files 
 fq1.close()
@@ -146,33 +179,13 @@ fq4.close()
 for file in file_handlers_dict:
     file_handlers_dict[file].close()
 
-
-
-
-
-
-
-###
-# Making sure input files are zipped and FASTQ files? do a check?
-###
-
-"""
-    For the 2 read FASTQ files and 2 index FASTQ files, will extract one read at at time (line by line) and append the read to its appropriate bucket file
-        1. Extract and store the header [only up to the space // all 4 files should have the same header up to the space]
-            [will append the pair of index sequences to the end of the header before outputting to files]
-        2. Extract and store the read 1 and read 2 sequence lines as well as index 1 and index 2 sequence lines 
-        3. Extract and store the third line of read 1 and read 2 
-        4. Extract and store the quality score lines of read1, read 2, and index 1, index 2 
-
-    Temp variables to include: header, R1seq, R2seq, I1seq, I2seq, line3, R1q, R2q, I1q, I2q
-
-        At this point you should know which bucket your reads should go to and you have all the info stored for both reads
-            To the pair of R1 and R2 files for the appropriate bucket (files should already be open):
-                output the modified header to each file
-                output the seq line to each file
-                output the 3rd line to each file
-                output the read quality score to each file 
-
-    When you reach the end of files, close out all the open output files 
-    Output the counts for read-pairs with matched indexes (one per index-pair), with index-hopping, and with unknwon indexes
-"""
+with open("counts.txt", "w") as fw:
+    fw.write("Number of matched index-pairs: " + str(counter_matched) + "\n")
+    fw.write("Number of swapped index-pairs: " + str(counter_swapped) + "\n")
+    fw.write("Number of unknown index-pairs: " + str(counter_unknown) + "\n")
+    fw.write("Matched read-pairs: \n") 
+    for i in counter_matched_dict:
+        fw.write(i + "\t" + str(counter_matched_dict[i]) + "\n")
+    fw.write("Swapped read-pairs: \n")
+    for i in counter_swapped_dict:
+        fw.write(i + "\t" + str(counter_swapped_dict[i]) + "\n") 
