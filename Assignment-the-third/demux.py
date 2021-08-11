@@ -8,6 +8,8 @@
 import argparse
 import Bioinfo
 import gzip
+import time
+import csv
 
 def get_args():
     """This function returns the parser arguments entered in command line"""
@@ -65,20 +67,19 @@ counter_swapped = 0
 counter_matched = 0
 
 # open all the output FASTQ files (48 matched files + 2 swapped + 2 unknown) to write to when parsing the input FASTQ files // open as zipped files
-#make sure to have gzip, "wt" and .fq.gz
-swapped_R1 = gzip.open(direct + "/swapped_R1.fq.gz", "wt")
-swapped_R2 = gzip.open(direct + "/swapped_R2.fq.gz", "wt")
-unknown_R1 = gzip.open(direct + "/unknown_R1.fq.gz", "wt")
-unknown_R2 = gzip.open(direct + "/unknown_R2.fq.gz", "wt")
+swapped_R1 = open(direct + "/swapped_R1.fq", "w")
+swapped_R2 = open(direct + "/swapped_R2.fq", "w")
+unknown_R1 = open(direct + "/unknown_R1.fq", "w")
+unknown_R2 = open(direct + "/unknown_R2.fq", "w")
 
 # Dictionary to store all the output file handlers to be able to reference when parsing through the input FASTQ files
 # Keys = name of file handle (same as file name), Values = the file handle
-file_handlers_dict = {"swapped_R1.fq.gz":swapped_R1, "swapped_R2.fq.gz":swapped_R2, "unknown_R1.fq.gz":unknown_R1, "unknown_R2.fq.gz":unknown_R2}
+file_handlers_dict = {"swapped_R1.fq":swapped_R1, "swapped_R2.fq":swapped_R2, "unknown_R1.fq":unknown_R1, "unknown_R2.fq":unknown_R2}
 for i in index_dict:
-    r1 = index_dict[i]["index"] + "_R1.fq.gz" 
-    r2 = index_dict[i]["index"] + "_R2.fq.gz"
-    file_handlers_dict[r1] = gzip.open(direct + "/" + r1, "wt") 
-    file_handlers_dict[r2] = gzip.open(direct + "/" + r2, "wt")
+    r1 = index_dict[i]["index"] + "_R1.fq" 
+    r2 = index_dict[i]["index"] + "_R2.fq"
+    file_handlers_dict[r1] = open(direct + "/" + r1, "w") 
+    file_handlers_dict[r2] = open(direct + "/" + r2, "w")
 
 # open input files (pair of read FASTQs and pair of index FASTQs)
 fq1 = gzip.open(files[0], "rt")
@@ -86,12 +87,9 @@ fq2 = gzip.open(files[1], "rt")
 fq3 = gzip.open(files[2], "rt")
 fq4 = gzip.open(files[3], "rt")
 
-
-
-
 # Begin parsing the 4 input files one read at a time in parallel
-while True:
-    # use a dict instead of list to store the 4 lines per each of the 4 reads??
+while True: 
+    # store the 4 lines of each of the 4 reads
     fq_reads = {"r1":{1:"", 2:"", 3:"", 4:""}, "r2":{1:"", 2:"", 3:"", 4:""}, "i1":{1:"", 2:"", 3:"", 4:""}, "i2":{1:"", 2:"", 3:"", 4:""}}
     for i in range(4):
         fq_reads["r1"][i] = fq1.readline().strip()
@@ -135,11 +133,11 @@ while True:
         counter_unknown += 1
 
     # append each read to the corresponding bucket file
-    r1file = file_handlers_dict[bucket + "_R1.fq.gz"]
-    r2file = file_handlers_dict[bucket + "_R2.fq.gz"]
+    r1file = file_handlers_dict[bucket + "_R1.fq"]
+    r2file = file_handlers_dict[bucket + "_R2.fq"]
 
-    r1file.write(fq_reads["r1"][0] + "\n" + fq_reads["r1"][1] + "\n" + fq_reads["r1"][2] + "\n" + fq_reads["r1"][3] + "\n")
-    r2file.write(fq_reads["r2"][0] + "\n" + fq_reads["r2"][1] + "\n" + fq_reads["r2"][2] + "\n" + fq_reads["r2"][3] + "\n")
+    r1file.write(header + "\n" + fq_reads["r1"][1] + "\n" + fq_reads["r1"][2] + "\n" + fq_reads["r1"][3] + "\n")
+    r2file.write(header + "\n" + fq_reads["r2"][1] + "\n" + fq_reads["r2"][2] + "\n" + fq_reads["r2"][3] + "\n")
 
 # close the input files 
 fq1.close()
@@ -153,22 +151,33 @@ for file in file_handlers_dict:
 
 # stats
 total_reads = counter_matched + counter_swapped + counter_unknown
-perc_matched = counter_matched / total_reads * 100
-perc_swapped = counter_swapped / total_reads * 100
-perc_unknown = counter_unknown / total_reads *100
-
+perc_matched = counter_matched / total_reads
+perc_swapped = counter_swapped / total_reads
+perc_unknown = counter_unknown / total_reads
 
 with open(countsfile, "w") as fw:
-    fw.write("Number (& %) of matched index-pairs: " + str(counter_matched) + " " + str(perc_matched) + "%\n")
-    fw.write("Number (& %) of swapped index-pairs: " + str(counter_swapped) + " " + str(perc_swapped) + "%\n")
-    fw.write("Number (& %) of unknown index-pairs: " + str(counter_unknown) + " " + str(perc_unknown) + "%\n")
+    fw.write("Number and percent of matched index-pairs: " + str(counter_matched) + "\t" + "{:.2%}".format(perc_matched) + "\n")
+    fw.write("Number and percent of swapped index-pairs: " + str(counter_swapped) + "\t" + "{:.2%}".format(perc_swapped) + "\n")
+    fw.write("Number and percent of unknown index-pairs: " + str(counter_unknown) + "\t" + "{:.2%}".format(perc_unknown) + "\n")
     fw.write("Matched read-pairs: \n") 
     for i in counter_matched_dict:
-        fw.write(i + "\t" + str(counter_matched_dict[i]) + "\n")
+        fw.write(i + "\t" + str(counter_matched_dict[i]) + "\t" + "{:.2%}".format(counter_matched_dict[i]/counter_matched) + "\n")
     fw.write("Swapped read-pairs: \n")
     for i in counter_swapped_dict:
-        fw.write(i + "\t" + str(counter_swapped_dict[i]) + "\n") 
-    
+        fw.write(i + "\t" + str(counter_swapped_dict[i]) + "\t" + "{:.2%}".format(counter_swapped_dict[i]/counter_swapped) + "\n") 
 
-# percentage of reads with from each sample (A1 = #reads/ total reads)
-# percentage of index hopped, matching, and swapped
+
+with open('stats1.tsv', 'w') as out:
+    fw = csv.writer(out, delimiter='\t')
+    fw.writerow(["Number and percent of matched index-pairs: ", str(counter_matched), "{:.2%}".format(perc_matched)])
+    fw.writerow(["Number and percent of swapped index-pairs: ", str(counter_swapped), "{:.2%}".format(perc_swapped)])
+    fw.writerow(["Number and percent of unknown index-pairs: ", str(counter_unknown), "{:.2%}".format(perc_unknown)])
+    fw.writerow(["Matched read-pairs: "]) 
+    for i in counter_matched_dict:
+        fw.writerow([index_dict[i]["index"], i, str(counter_matched_dict[i]), "{:.2%}".format(counter_matched_dict[i]/counter_matched)])
+    fw.writerow(["Swapped read-pairs: "])
+    for i in counter_swapped_dict:
+        fw.writerow([i, str(counter_swapped_dict[i]), "{:.2%}".format(counter_swapped_dict[i]/counter_swapped)]) 
+
+
+# sorting stats file for the matched, swapped indexES?
