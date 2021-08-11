@@ -17,7 +17,7 @@ def get_args():
     parser.add_argument("-f", "--files", help="Input FASTQ filenames (one read pair, one index pair)", nargs=4, required=True)
     parser.add_argument("-i", "--indexes", help="Index filename", required=True)
     parser.add_argument("-d", "--direct", help="Output directory", required=True)
-    parser.add_argument("-c", "--counts", help="Counts filename", required=True)
+    parser.add_argument("-s", "--stats", help="Stats filename", required=True)
     return parser.parse_args()
 
 # store the command line args in variables
@@ -25,7 +25,7 @@ args = get_args()
 files= args.files
 indexes = args.indexes
 direct = args.direct
-countsfile = args.counts
+stats = args.stats
 
 # Dictionary to store list of index seqs and other related index info (sample, group, treatment, index)
 # Key = index sequence, Value = Dictionary identifying sample, group, treatment, and index values
@@ -155,19 +155,19 @@ perc_matched = counter_matched / total_reads
 perc_swapped = counter_swapped / total_reads
 perc_unknown = counter_unknown / total_reads
 
-with open(countsfile, "w") as fw:
-    fw.write("Number and percent of matched index-pairs: " + str(counter_matched) + "\t" + "{:.2%}".format(perc_matched) + "\n")
-    fw.write("Number and percent of swapped index-pairs: " + str(counter_swapped) + "\t" + "{:.2%}".format(perc_swapped) + "\n")
-    fw.write("Number and percent of unknown index-pairs: " + str(counter_unknown) + "\t" + "{:.2%}".format(perc_unknown) + "\n")
-    fw.write("Matched read-pairs: \n") 
-    for i in counter_matched_dict:
-        fw.write(i + "\t" + str(counter_matched_dict[i]) + "\t" + "{:.2%}".format(counter_matched_dict[i]/counter_matched) + "\n")
-    fw.write("Swapped read-pairs: \n")
-    for i in counter_swapped_dict:
-        fw.write(i + "\t" + str(counter_swapped_dict[i]) + "\t" + "{:.2%}".format(counter_swapped_dict[i]/counter_swapped) + "\n") 
+# with open(stats, "w") as fw:
+#     fw.write("Number and percent of matched index-pairs: " + str(counter_matched) + "\t" + "{:.2%}".format(perc_matched) + "\n")
+#     fw.write("Number and percent of swapped index-pairs: " + str(counter_swapped) + "\t" + "{:.2%}".format(perc_swapped) + "\n")
+#     fw.write("Number and percent of unknown index-pairs: " + str(counter_unknown) + "\t" + "{:.2%}".format(perc_unknown) + "\n")
+#     fw.write("Matched read-pairs: \n") 
+#     for i in counter_matched_dict:
+#         fw.write(i + "\t" + str(counter_matched_dict[i]) + "\t" + "{:.2%}".format(counter_matched_dict[i]/counter_matched) + "\n")
+#     fw.write("Swapped read-pairs: \n")
+#     for i in counter_swapped_dict:
+#         fw.write(i + "\t" + str(counter_swapped_dict[i]) + "\t" + "{:.2%}".format(counter_swapped_dict[i]/counter_swapped) + "\n") 
 
 
-with open('stats1.tsv', 'w') as out:
+with open(stats, 'w') as out:
     fw = csv.writer(out, delimiter='\t')
     fw.writerow(["Number and percent of matched index-pairs: ", str(counter_matched), "{:.2%}".format(perc_matched)])
     fw.writerow(["Number and percent of swapped index-pairs: ", str(counter_swapped), "{:.2%}".format(perc_swapped)])
