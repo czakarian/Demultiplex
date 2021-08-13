@@ -101,13 +101,13 @@ while True:
     if fq_reads["r1"][0] == '':
         break
 
-    # store the rc of index2 seq so you only need to call the actual fxn once
+    # store the rc of index2 seq so you only need to call the actual fxn once in the loop 
     rc = Bioinfo.rev_comp(fq_reads["i2"][1])
 
     # append i1 and i2 rc indexes to the header
     header = fq_reads["r1"][0].split(' ')[0] + "-" + fq_reads["i1"][1] + "-" + rc
     
-    # determine which bucket your read will be sent to
+    # will store which bucket your read will be sent to
     bucket = ""
 
     # check if both indexes are valid / don't contain N's and meet the quality score cutoff
@@ -135,7 +135,6 @@ while True:
     # append each read to the corresponding bucket file
     r1file = file_handlers_dict[bucket + "_R1.fq"]
     r2file = file_handlers_dict[bucket + "_R2.fq"]
-
     r1file.write(header + "\n" + fq_reads["r1"][1] + "\n" + fq_reads["r1"][2] + "\n" + fq_reads["r1"][3] + "\n")
     r2file.write(header + "\n" + fq_reads["r2"][1] + "\n" + fq_reads["r2"][2] + "\n" + fq_reads["r2"][3] + "\n")
 
@@ -151,33 +150,37 @@ for file in file_handlers_dict:
 
 # stats
 total_reads = counter_matched + counter_swapped + counter_unknown
-perc_matched = counter_matched / total_reads
-perc_swapped = counter_swapped / total_reads
-perc_unknown = counter_unknown / total_reads
+perc_matched = counter_matched / total_reads * 100
+perc_swapped = counter_swapped / total_reads * 100
+perc_unknown = counter_unknown / total_reads * 100
 
-# with open(stats, "w") as fw:
-#     fw.write("Number and percent of matched index-pairs: " + str(counter_matched) + "\t" + "{:.2%}".format(perc_matched) + "\n")
-#     fw.write("Number and percent of swapped index-pairs: " + str(counter_swapped) + "\t" + "{:.2%}".format(perc_swapped) + "\n")
-#     fw.write("Number and percent of unknown index-pairs: " + str(counter_unknown) + "\t" + "{:.2%}".format(perc_unknown) + "\n")
-#     fw.write("Matched read-pairs: \n") 
-#     for i in counter_matched_dict:
-#         fw.write(i + "\t" + str(counter_matched_dict[i]) + "\t" + "{:.2%}".format(counter_matched_dict[i]/counter_matched) + "\n")
-#     fw.write("Swapped read-pairs: \n")
-#     for i in counter_swapped_dict:
-#         fw.write(i + "\t" + str(counter_swapped_dict[i]) + "\t" + "{:.2%}".format(counter_swapped_dict[i]/counter_swapped) + "\n") 
+def sortbyValue_matched(elem):
+    """This function takes a dictionary and returns the list of values of that dictionary // to be used as sorting key"""
+    return counter_matched_dict[elem]
+def sortbyValue_swapped(elem):
+    """This function takes a dictionary and returns the list of values of that dictionary // to be used as sorting key"""
+    return counter_swapped_dict[elem]
 
+# sort the matched and swapped dictionaries by the couunts
+sorted_counter_matched_dict = sorted(counter_matched_dict, key=sortbyValue_matched, reverse=True)
+sorted_counter_swapped_dict = sorted(counter_swapped_dict, key=sortbyValue_swapped, reverse=True)
 
-with open(stats, 'w') as out:
+# output overall stats to stats.txt
+with open(stats + "_overall.tsv", 'w') as out:
     fw = csv.writer(out, delimiter='\t')
-    fw.writerow(["Number and percent of matched index-pairs: ", str(counter_matched), "{:.2%}".format(perc_matched)])
-    fw.writerow(["Number and percent of swapped index-pairs: ", str(counter_swapped), "{:.2%}".format(perc_swapped)])
-    fw.writerow(["Number and percent of unknown index-pairs: ", str(counter_unknown), "{:.2%}".format(perc_unknown)])
-    fw.writerow(["Matched read-pairs: "]) 
-    for i in counter_matched_dict:
-        fw.writerow([index_dict[i]["index"], i, str(counter_matched_dict[i]), "{:.2%}".format(counter_matched_dict[i]/counter_matched)])
-    fw.writerow(["Swapped read-pairs: "])
-    for i in counter_swapped_dict:
-        fw.writerow([i, str(counter_swapped_dict[i]), "{:.2%}".format(counter_swapped_dict[i]/counter_swapped)]) 
+    fw.writerow(["Group","Count", "Percentage of total read-pairs (%)"]) 
+    fw.writerow(["Matched", counter_matched, "{:.4f}".format(perc_matched)])
+    fw.writerow(["Swapped", counter_swapped, "{:.4f}".format(perc_swapped)])
+    fw.writerow(["Unknown", counter_unknown, "{:.4f}".format(perc_unknown)])
 
-
-# sorting stats file for the matched, swapped indexES?
+# output counts and percentages of individual matched and swapped read pairs to stats.tsv
+with open(stats + "_ind.tsv", 'w') as out:
+    fw = csv.writer(out, delimiter='\t')
+    # output header row 
+    fw.writerow(["Index 1", "Index 2", "Count", "Percentage of total read-pairs (%)"]) 
+    # output matched read pairs
+    for i in sorted_counter_matched_dict:
+        fw.writerow([i, i, counter_matched_dict[i], "{:.4f}".format(counter_matched_dict[i]/total_reads*100)])
+    # output swapped read pairs
+    for i in sorted_counter_swapped_dict:
+        fw.writerow([i[0:8], i[9:17], counter_swapped_dict[i], "{:.4f}".format(counter_swapped_dict[i]/total_reads*100)]) 
